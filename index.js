@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Servidor MCP da AGENTUM — expõe as 5 rotas reais do Payment Agent
+ * Servidor MCP da AGENTUM — expõe as 9 rotas reais do Payment Agent
  * (https://agentum.lat) como ferramentas MCP, pra qualquer agente de IA
  * com suporte a Model Context Protocol (Claude Desktop, Claude Code, etc.)
  * chamar e pagar direto em USDC via x402, sem precisar conhecer o
@@ -57,6 +57,10 @@ const PRICE_CAP_UNITS = {
   "verificar-cep": "20000", // preço real $0.01
   "validar-cpf": "20000", // preço real $0.01
   "business-intelligence": "70000", // preço real $0.05
+  "fx-rates": "20000", // preço real $0.01
+  "economic-data": "20000", // preço real $0.01
+  "vat-validate": "20000", // preço real $0.01
+  "company-enrich": "20000", // preço real $0.01
 };
 
 function onlyDigits(v) {
@@ -218,6 +222,81 @@ server.registerTool(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ cnpj: clean }),
     });
+    return jsonToolResult(data);
+  }
+);
+
+server.registerTool(
+  "fx_rates",
+  {
+    title: "Câmbio (qualquer moeda)",
+    description:
+      "Taxas de câmbio oficiais em tempo real (Banco Central Europeu, via Frankfurter) — qualquer par de moedas, não só BRL. Pagamento real de $0.01 em USDC (Base mainnet).",
+    inputSchema: {
+      base: z.string().optional().describe("Moeda base (ISO 4217, ex: USD). Default: USD"),
+      symbols: z.string().optional().describe("Moedas de destino separadas por vírgula (ex: BRL,EUR). Default: BRL,EUR,USD"),
+    },
+  },
+  async ({ base, symbols }) => {
+    const qs = new URLSearchParams();
+    if (base) qs.set("base", base);
+    if (symbols) qs.set("symbols", symbols);
+    const data = await payAndCall("fx-rates", `/fx-rates${qs.toString() ? "?" + qs.toString() : ""}`, { method: "GET" });
+    return jsonToolResult(data);
+  }
+);
+
+server.registerTool(
+  "economic_data",
+  {
+    title: "Indicadores econômicos (qualquer país)",
+    description:
+      "Indicadores econômicos oficiais (Banco Mundial) de qualquer país: crescimento do PIB, inflação, desemprego, população. Pagamento real de $0.01 em USDC (Base mainnet).",
+    inputSchema: {
+      country: z.string().describe("Código ISO 3166-1 alpha-2 do país (ex: BR, US, DE)"),
+      metric: z.enum(["gdp_growth", "inflation", "unemployment", "population"]).describe("Indicador desejado"),
+    },
+  },
+  async ({ country, metric }) => {
+    const data = await payAndCall("economic-data", `/economic-data?country=${encodeURIComponent(country)}&metric=${encodeURIComponent(metric)}`, { method: "GET" });
+    return jsonToolResult(data);
+  }
+);
+
+server.registerTool(
+  "vat_validate",
+  {
+    title: "Validar VAT europeu",
+    description:
+      "Validação de número de VAT (IVA) europeu em tempo real (VIES, serviço oficial da UE). Pagamento real de $0.01 em USDC (Base mainnet).",
+    inputSchema: {
+      country: z.string().describe("Código de país da UE, 2 letras (ex: IE, DE, FR)"),
+      vat: z.string().describe("Número de VAT, sem o prefixo do país"),
+    },
+  },
+  async ({ country, vat }) => {
+    const data = await payAndCall("vat-validate", `/vat-validate?country=${encodeURIComponent(country)}&vat=${encodeURIComponent(vat)}`, { method: "GET" });
+    return jsonToolResult(data);
+  }
+);
+
+server.registerTool(
+  "company_enrich",
+  {
+    title: "Identificação global de empresa (LEI)",
+    description:
+      "Identificação global de empresa via LEI (Legal Entity Identifier, GLEIF) — busca por nome ou código LEI, cobre qualquer país. Pagamento real de $0.01 em USDC (Base mainnet).",
+    inputSchema: {
+      name: z.string().optional().describe("Nome (ou parte do nome) da empresa a buscar"),
+      lei: z.string().optional().describe("Código LEI de 20 caracteres, se já souber"),
+    },
+  },
+  async ({ name, lei }) => {
+    if (!name && !lei) throw new Error("Informe 'name' ou 'lei'.");
+    const qs = new URLSearchParams();
+    if (lei) qs.set("lei", lei);
+    if (name) qs.set("name", name);
+    const data = await payAndCall("company-enrich", `/company-enrich?${qs.toString()}`, { method: "GET" });
     return jsonToolResult(data);
   }
 );

@@ -1,10 +1,11 @@
 # @agentum/mcp-server
 
 Servidor MCP (Model Context Protocol) que expõe as APIs reais da AGENTUM
-(dados brasileiros: CNPJ, CEP, taxas oficiais, CPF, inteligência
-empresarial) como ferramentas que qualquer agente de IA com suporte a MCP
-(Claude Desktop, Claude Code, etc.) pode chamar diretamente — pagando por
-uso, em USDC real, via protocolo [x402](https://x402.org).
+(dados brasileiros e globais: CNPJ, CEP, taxas oficiais, CPF, inteligência
+empresarial, LEI, VAT europeu, câmbio, indicadores econômicos) como
+ferramentas que qualquer agente de IA com suporte a MCP (Claude Desktop,
+Claude Code, etc.) pode chamar diretamente — pagando por uso, em USDC
+real, via protocolo [x402](https://x402.org).
 
 Sem chave de API, sem cadastro, sem assinatura mensal. Cada chamada é um
 pagamento on-chain (Base mainnet) na hora.
@@ -18,6 +19,10 @@ pagamento on-chain (Base mainnet) na hora.
 | `verificar_cep` | $0.01 | Endereço completo a partir do CEP |
 | `validar_cpf` | $0.01 | Confere dígito verificador (não consulta dado pessoal) |
 | `business_intelligence` | $0.05 | CNPJ completo + sócios + resumo gerado por IA |
+| `fx_rates` | $0.01 | Câmbio oficial (Banco Central Europeu), qualquer par de moedas |
+| `economic_data` | $0.01 | PIB, inflação, desemprego, população (Banco Mundial), qualquer país |
+| `vat_validate` | $0.01 | Validação de VAT europeu em tempo real (VIES, oficial da UE) |
+| `company_enrich` | $0.01 | Identificação global de empresa via LEI (GLEIF), qualquer país |
 
 ## Pré-requisito: sua própria carteira
 

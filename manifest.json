@@ -2,8 +2,8 @@
   "manifest_version": "0.3",
   "name": "agentum-mcp-server",
   "display_name": "AGENTUM",
-  "version": "1.0.0",
-  "description": "Dados brasileiros reais (CNPJ, CEP, taxas, CPF) via MCP, pagos em USDC por chamada (x402).",
+  "version": "1.1.0",
+  "description": "Dados globais reais (CNPJ, CEP, LEI, VAT, câmbio) via MCP, pagos em USDC por chamada (x402).",
   "long_description": "Expõe 5 ferramentas da AGENTUM (verificar_cnpj, taxas_brasil, verificar_cep, validar_cpf, business_intelligence) que qualquer agente de IA pode chamar diretamente, pagando por uso em USDC (Base mainnet) via protocolo x402 — sem cadastro, sem assinatura mensal. Você usa a própria carteira, nunca a da AGENTUM.",
   "author": {
     "name": "AGENTUM",
