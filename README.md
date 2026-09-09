@@ -23,6 +23,9 @@ pagamento on-chain (Base mainnet) na hora.
 | `economic_data` | $0.01 | PIB, inflação, desemprego, população (Banco Mundial), qualquer país |
 | `vat_validate` | $0.01 | Validação de VAT europeu em tempo real (VIES, oficial da UE) |
 | `company_enrich` | $0.01 | Identificação global de empresa via LEI (GLEIF), qualquer país |
+| `company_intelligence_br` | $0.02 | CNPJ + compliance (TCU, CNJ, CEIS, CNEP, CVM) — só fatos, sem score |
+
+`company_intelligence_br` usa uma carteira de destino diferente das outras (sistema AGENTUM Business, processo/domínio separados de propósito) — o servidor já sabe disso e valida cada rota contra a carteira certa dela.
 
 ## Pré-requisito: sua própria carteira
 

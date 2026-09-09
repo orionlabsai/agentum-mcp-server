@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Servidor MCP da AGENTUM — expõe as 9 rotas reais do Payment Agent
- * (https://agentum.lat) como ferramentas MCP, pra qualquer agente de IA
- * com suporte a Model Context Protocol (Claude Desktop, Claude Code, etc.)
- * chamar e pagar direto em USDC via x402, sem precisar conhecer o
- * protocolo x402 nem escrever código de pagamento.
+ * Servidor MCP da AGENTUM — expõe 10 rotas reais (9 do Payment Agent,
+ * https://agentum.lat, + 1 do AGENTUM Business, https://business.agentum.lat)
+ * como ferramentas MCP, pra qualquer agente de IA com suporte a Model
+ * Context Protocol (Claude Desktop, Claude Code, etc.) chamar e pagar
+ * direto em USDC via x402, sem precisar conhecer o protocolo x402 nem
+ * escrever código de pagamento.
  *
  * Quem instala este servidor fornece a PRÓPRIA carteira (variável de
  * ambiente AGENTUM_MCP_WALLET_KEY) — nunca a carteira da AGENTUM. Cada
@@ -38,29 +39,33 @@ const { ExactEvmScheme } = require("@x402/evm/exact/client");
 const { privateKeyToAccount } = require("viem/accounts");
 const { z } = require("zod");
 
-const BASE_URL = "https://agentum.lat";
 const BASE_MAINNET = "eip155:8453";
 const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const AGENTUM_WALLET = "0x1B3217B3F1110b879b687Cc8A23025D197F36dAB";
+// carteira separada do agentum-business (processo/domínio isolados de
+// propósito do payment-agent) -- confirmado ao vivo no payTo real do 402
+// de business.agentum.lat/company-intelligence, não é suposição.
+const BUSINESS_WALLET = "0x7D1EDdfBd167787251fed83b250ABBeA1cf59a6F";
 
 const WALLET_KEY_ENV = "AGENTUM_MCP_WALLET_KEY";
 
-// preço máximo aceito por rota (em unidades atômicas de USDC, 6 casas
-// decimais, string porque é isso que setSpendControls exige) — sempre um
-// pouco acima do preço real declarado no server.js, só como cinto-de-
-// segurança contra um servidor comprometido/errado pedindo mais do que
-// deveria. Nunca confiar cegamente no valor que o 402 devolve. Rota sem
-// entrada aqui é tratada como erro (nunca como "sem teto"), ver makeClient.
-const PRICE_CAP_UNITS = {
-  "verificar-cnpj": "30000", // preço real $0.02
-  "taxas-brasil": "20000", // preço real $0.01
-  "verificar-cep": "20000", // preço real $0.01
-  "validar-cpf": "20000", // preço real $0.01
-  "business-intelligence": "70000", // preço real $0.05
-  "fx-rates": "20000", // preço real $0.01
-  "economic-data": "20000", // preço real $0.01
-  "vat-validate": "20000", // preço real $0.01
-  "company-enrich": "20000", // preço real $0.01
+// config por rota: host real + teto de preço (unidades atômicas de USDC,
+// 6 casas decimais, string porque é isso que setSpendControls exige,
+// sempre um pouco acima do preço real declarado no server.js/x402 config
+// de origem) + carteira que essa rota específica tem permissão de receber.
+// Rota sem entrada aqui é tratada como erro (nunca "sem teto"/"sem host"),
+// ver makeClient/payAndCall.
+const ROUTES = {
+  "verificar-cnpj": { baseUrl: "https://agentum.lat", cap: "30000", payTo: AGENTUM_WALLET }, // preço real $0.02
+  "taxas-brasil": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
+  "verificar-cep": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
+  "validar-cpf": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
+  "business-intelligence": { baseUrl: "https://agentum.lat", cap: "70000", payTo: AGENTUM_WALLET }, // preço real $0.05
+  "fx-rates": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
+  "economic-data": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
+  "vat-validate": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
+  "company-enrich": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
+  "company-intelligence": { baseUrl: "https://business.agentum.lat", cap: "30000", payTo: BUSINESS_WALLET }, // preço real $0.02, sistema separado (AGENTUM Business)
 };
 
 function onlyDigits(v) {
@@ -90,9 +95,9 @@ function readSigner() {
  * setSpendControls vale pro client inteiro.
  */
 function makeClient(routeKey) {
-  const cap = PRICE_CAP_UNITS[routeKey];
-  if (!cap) {
-    throw new Error(`Rota "${routeKey}" sem teto de preço configurado em PRICE_CAP_UNITS — abortando por segurança.`);
+  const route = ROUTES[routeKey];
+  if (!route) {
+    throw new Error(`Rota "${routeKey}" sem configuração em ROUTES — abortando por segurança.`);
   }
   const signer = readSigner();
   const client = new x402Client();
@@ -103,15 +108,17 @@ function makeClient(routeKey) {
   // só USDC-Base, com teto atômico da rota -- aplicado na SELEÇÃO do
   // requirement, ou seja, no mesmo objeto que depois vira assinatura.
   client.setSpendControls({
-    allowedAssets: [{ network: BASE_MAINNET, asset: USDC_BASE, maxAmountPerPayment: cap }],
+    allowedAssets: [{ network: BASE_MAINNET, asset: USDC_BASE, maxAmountPerPayment: route.cap }],
   });
   // payTo não é coberto por setSpendControls -- confere aqui, direto no
   // requirement já selecionado (context.selectedRequirements), imediatamente
-  // antes da assinatura de verdade acontecer.
+  // antes da assinatura de verdade acontecer. Cada rota só aceita a SUA
+  // própria carteira (agentum.lat e business.agentum.lat são sistemas/
+  // carteiras separados de propósito).
   client.onBeforePaymentCreation(async (ctx) => {
     const payTo = String(ctx.selectedRequirements?.payTo || "");
-    if (payTo.toLowerCase() !== AGENTUM_WALLET.toLowerCase()) {
-      return { abort: true, reason: `payTo inesperado (${payTo}) — só a carteira oficial da AGENTUM é permitida.` };
+    if (payTo.toLowerCase() !== route.payTo.toLowerCase()) {
+      return { abort: true, reason: `payTo inesperado (${payTo}) — só a carteira oficial dessa rota é permitida.` };
     }
     return void 0;
   });
@@ -119,13 +126,13 @@ function makeClient(routeKey) {
 }
 
 /**
- * Faz uma chamada paga de verdade (x402) numa rota do Payment Agent.
- * routeKey identifica o teto de preço (PRICE_CAP_UNITS); path/requestInit
- * definem a requisição HTTP real.
+ * Faz uma chamada paga de verdade (x402) numa rota do Payment Agent (ou de
+ * outro sistema AGENTUM, ver ROUTES). routeKey identifica o host/teto/
+ * carteira esperados; path/requestInit definem a requisição HTTP real.
  */
 async function payAndCall(routeKey, path, requestInit) {
-  const url = BASE_URL + path;
-  const client = makeClient(routeKey);
+  const client = makeClient(routeKey); // valida a existência da rota primeiro, com erro claro
+  const url = ROUTES[routeKey].baseUrl + path;
   const httpClient = new x402HTTPClient(client);
   const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 
@@ -297,6 +304,22 @@ server.registerTool(
     if (lei) qs.set("lei", lei);
     if (name) qs.set("name", name);
     const data = await payAndCall("company-enrich", `/company-enrich?${qs.toString()}`, { method: "GET" });
+    return jsonToolResult(data);
+  }
+);
+
+server.registerTool(
+  "company_intelligence_br",
+  {
+    title: "Inteligência empresarial + compliance (CNPJ, sistema AGENTUM Business)",
+    description:
+      "Investigação empresarial baseada em evidências pra um CNPJ brasileiro: além do cadastro (BrasilAPI/ReceitaWS), cruza fontes públicas oficiais de compliance — TCU (licitantes inidôneos), CNIA/CNJ, CEIS, CNEP, e CVM quando aplicável. Só fatos e cobertura por fonte, nunca um 'score' inventado. Pagamento real de $0.02 em USDC (Base mainnet) — sistema separado (AGENTUM Business), carteira diferente das outras ferramentas.",
+    inputSchema: { cnpj: z.string().describe("CNPJ brasileiro, 14 dígitos, com ou sem pontuação") },
+  },
+  async ({ cnpj }) => {
+    const clean = onlyDigits(cnpj);
+    if (clean.length !== 14) throw new Error("CNPJ inválido — precisa ter 14 dígitos numéricos.");
+    const data = await payAndCall("company-intelligence", `/company-intelligence?cnpj=${clean}`, { method: "GET" });
     return jsonToolResult(data);
   }
 );
