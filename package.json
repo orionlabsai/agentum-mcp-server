@@ -1,0 +1,39 @@
+{
+  "name": "@agentum/mcp-server",
+  "version": "1.0.0",
+  "mcpName": "io.github.orionlabsai/agentum-mcp-server",
+  "description": "Servidor MCP da AGENTUM — dados brasileiros reais (CNPJ, CEP, taxas oficiais, CPF, inteligência empresarial) pra qualquer agente de IA consumir via x402, pagando por chamada em USDC.",
+  "type": "commonjs",
+  "main": "index.js",
+  "bin": {
+    "agentum-mcp": "index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/orionlabsai/agentum-mcp-server.git"
+  },
+  "homepage": "https://agentum.lat",
+  "keywords": [
+    "mcp",
+    "x402",
+    "cnpj",
+    "cpf",
+    "cep",
+    "brasil",
+    "usdc",
+    "payments"
+  ],
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test test/"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@x402/core": "^2.23.0",
+    "@x402/evm": "^2.23.0",
+    "@x402/fetch": "^2.23.0",
+    "viem": "^2.56.0",
+    "zod": "^3.25.0"
+  }
+}

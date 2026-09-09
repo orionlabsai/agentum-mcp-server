@@ -1,0 +1,35 @@
+{
+  "manifest_version": "0.3",
+  "name": "agentum-mcp-server",
+  "display_name": "AGENTUM",
+  "version": "1.0.0",
+  "description": "Dados brasileiros reais (CNPJ, CEP, taxas, CPF) via MCP, pagos em USDC por chamada (x402).",
+  "long_description": "Expõe 5 ferramentas da AGENTUM (verificar_cnpj, taxas_brasil, verificar_cep, validar_cpf, business_intelligence) que qualquer agente de IA pode chamar diretamente, pagando por uso em USDC (Base mainnet) via protocolo x402 — sem cadastro, sem assinatura mensal. Você usa a própria carteira, nunca a da AGENTUM.",
+  "author": {
+    "name": "AGENTUM",
+    "email": "agentumcomercial@carmozinog.com",
+    "url": "https://agentum.lat"
+  },
+  "homepage": "https://agentum.lat",
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/index.js"],
+      "env": {
+        "AGENTUM_MCP_WALLET_KEY": "${user_config.wallet_key}"
+      }
+    }
+  },
+  "user_config": {
+    "wallet_key": {
+      "type": "string",
+      "title": "Chave privada da carteira (Base, USDC)",
+      "description": "Chave privada (0x... 64 hex) da sua própria carteira Ethereum, com saldo em USDC na rede Base. Nunca use uma carteira que também guarda outros fundos importantes.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

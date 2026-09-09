@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.orionlabsai/agentum-mcp-server",
+  "description": "Dados brasileiros reais (CNPJ, CEP, taxas, CPF) via MCP, pagos em USDC por chamada (x402).",
+  "repository": {
+    "url": "https://github.com/orionlabsai/agentum-mcp-server",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@agentum/mcp-server",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "Chave privada (0x... 64 hex) da sua própria carteira Ethereum, com saldo em USDC na rede Base. Nunca a chave da AGENTUM — cada usuário paga com a própria carteira.",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true,
+          "name": "AGENTUM_MCP_WALLET_KEY"
+        }
+      ]
+    }
+  ]
+}
