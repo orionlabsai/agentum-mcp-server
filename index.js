@@ -41,7 +41,7 @@ const { z } = require("zod");
 
 const BASE_MAINNET = "eip155:8453";
 const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const AGENTUM_WALLET = "0x1B3217B3F1110b879b687Cc8A23025D197F36dAB";
+const AGENTUM_WALLET = "0xB4f9061e3a6A5533431336506b34e1035029599f";
 // carteira separada do agentum-business (processo/domínio isolados de
 // propósito do payment-agent) -- confirmado ao vivo no payTo real do 402
 // de business.agentum.lat/company-intelligence, não é suposição.
