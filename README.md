@@ -4,11 +4,104 @@ Servidor MCP (Model Context Protocol) que expõe as APIs reais da AGENTUM
 (dados brasileiros e globais: CNPJ, CEP, taxas oficiais, CPF, inteligência
 empresarial, LEI, VAT europeu, câmbio, indicadores econômicos) como
 ferramentas que qualquer agente de IA com suporte a MCP (Claude Desktop,
-Claude Code, etc.) pode chamar diretamente — pagando por uso, em USDC
-real, via protocolo [x402](https://x402.org).
+Claude Code, Cursor, etc.) pode chamar diretamente — pagando por uso, em
+USDC real, via protocolo [x402](https://x402.org).
 
 Sem chave de API, sem cadastro, sem assinatura mensal. Cada chamada é um
-pagamento on-chain (Base mainnet) na hora.
+pagamento on-chain (Base mainnet) na hora, direto do pacote publicado no
+npm — não precisa clonar este repositório pra usar.
+
+## Quick Start (menos de 5 minutos)
+
+Você precisa de duas coisas: uma carteira Ethereum dedicada com um pouco
+de **USDC na rede Base** (mainnet, `eip155:8453` — poucos centavos já
+bastam pra testar; o facilitador de pagamento patrocina o gás, só precisa
+de USDC mesmo), e um cliente com suporte a MCP. Escolha o seu:
+
+<details>
+<summary><strong>Claude Desktop</strong></summary>
+
+Edite (ou crie) `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "agentum": {
+      "command": "npx",
+      "args": ["-y", "@agentum/mcp-server"],
+      "env": {
+        "AGENTUM_MCP_WALLET_KEY": "0xSUACHAVEPRIVADAAQUI"
+      }
+    }
+  }
+}
+```
+
+Reinicie o Claude Desktop. Pronto — pergunte algo como "verifica o CNPJ
+68964713000109" e o Claude vai chamar a ferramenta sozinho.
+</details>
+
+<details>
+<summary><strong>Claude Code (CLI)</strong></summary>
+
+```bash
+claude mcp add agentum --env AGENTUM_MCP_WALLET_KEY=0xSUACHAVEPRIVADAAQUI -- npx -y @agentum/mcp-server
+```
+
+(`--env` vem antes do `--`; tudo depois do `--` é passado intacto pro
+servidor.)
+</details>
+
+<details>
+<summary><strong>Cursor</strong></summary>
+
+Crie `.cursor/mcp.json` no projeto (ou `~/.cursor/mcp.json` pra valer em
+todos os projetos):
+
+```json
+{
+  "mcpServers": {
+    "agentum": {
+      "command": "npx",
+      "args": ["-y", "@agentum/mcp-server"],
+      "env": {
+        "AGENTUM_MCP_WALLET_KEY": "0xSUACHAVEPRIVADAAQUI"
+      }
+    }
+  }
+}
+```
+</details>
+
+**Nunca use uma carteira que também guarda fundos importantes** — use uma
+dedicada, só com o USDC necessário pro uso que você pretende fazer.
+
+### Exemplo real de ponta a ponta
+
+Prompt pro agente: *"verifica o CNPJ 68964713000109"*
+
+O agente decide sozinho chamar `verificar_cnpj({ cnpj: "68964713000109" })`
+— o servidor assina um pagamento real de $0.02 USDC na Base, a AGENTUM
+processa e devolve, e o agente recebe de volta (dado real, de produção):
+
+```json
+{
+  "cnpj": "68.964.713/0001-09",
+  "razao_social": "AGENTUM LTDA",
+  "situacao": "ATIVA",
+  "data_situacao": "03/09/2026",
+  "abertura": "03/09/2026",
+  "natureza_juridica": "206-2 - Sociedade Empresária Limitada",
+  "uf": "SP",
+  "municipio": "SERTAOZINHO",
+  "atividade_principal": "Desenvolvimento e licenciamento de programas de computador customizáveis",
+  "fonte": "receitaws"
+}
+```
+
+Nenhum código de pagamento escrito por você — o servidor cuida do desafio
+x402, da assinatura e da checagem de segurança (ver seção "Segurança"
+abaixo) sozinho.
 
 ## Ferramentas disponíveis
 
@@ -27,34 +120,15 @@ pagamento on-chain (Base mainnet) na hora.
 
 `company_intelligence_br` usa uma carteira de destino diferente das outras (sistema AGENTUM Business, processo/domínio separados de propósito) — o servidor já sabe disso e valida cada rota contra a carteira certa dela.
 
-## Pré-requisito: sua própria carteira
+## Rodando a partir do código-fonte (desenvolvimento)
 
-Você precisa de uma carteira Ethereum com um pouco de **USDC na rede Base**
-(mainnet, `eip155:8453`). O facilitador de pagamento (PayAI) patrocina o
-gás — a carteira só precisa de USDC, não precisa de ETH.
-
-**Nunca use uma carteira que também guarda fundos importantes.** Use uma
-carteira dedicada, com só o USDC necessário pros testes/uso que você
-pretende fazer (poucos centavos por chamada).
-
-## Instalação
+Se você clonou este repositório em vez de usar o pacote publicado (`npx`),
+a configuração aponta pro arquivo local em vez de deixar o `npx` resolver:
 
 ```bash
 npm install
-```
-
-## Configuração
-
-Defina a variável de ambiente `AGENTUM_MCP_WALLET_KEY` com a chave privada
-(formato `0x...`, 64 caracteres hex) da sua carteira:
-
-```bash
 export AGENTUM_MCP_WALLET_KEY=0xSUACHAVEPRIVADAAQUI
 ```
-
-### Claude Desktop / Claude Code
-
-Adicione ao `claude_desktop_config.json` (ou equivalente):
 
 ```json
 {
