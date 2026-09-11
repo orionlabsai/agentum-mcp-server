@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Servidor MCP da AGENTUM — expõe 10 rotas reais (9 do Payment Agent,
- * https://agentum.lat, + 1 do AGENTUM Business, https://business.agentum.lat)
+ * Servidor MCP da AGENTUM — expõe 11 rotas reais (9 do Payment Agent,
+ * https://agentum.lat, + 2 do AGENTUM Business, https://business.agentum.lat)
  * como ferramentas MCP, pra qualquer agente de IA com suporte a Model
  * Context Protocol (Claude Desktop, Claude Code, etc.) chamar e pagar
  * direto em USDC via x402, sem precisar conhecer o protocolo x402 nem
@@ -66,6 +66,7 @@ const ROUTES = {
   "vat-validate": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
   "company-enrich": { baseUrl: "https://agentum.lat", cap: "20000", payTo: AGENTUM_WALLET }, // preço real $0.01
   "company-intelligence": { baseUrl: "https://business.agentum.lat", cap: "30000", payTo: BUSINESS_WALLET }, // preço real $0.02, sistema separado (AGENTUM Business)
+  "preflight": { baseUrl: "https://business.agentum.lat", cap: "200000", payTo: BUSINESS_WALLET }, // preço real $0.15, confirmado ao vivo (11/09), sistema separado (AGENTUM Business)
 };
 
 function onlyDigits(v) {
@@ -320,6 +321,21 @@ server.registerTool(
     const clean = onlyDigits(cnpj);
     if (clean.length !== 14) throw new Error("CNPJ inválido — precisa ter 14 dígitos numéricos.");
     const data = await payAndCall("company-intelligence", `/company-intelligence?cnpj=${clean}`, { method: "GET" });
+    return jsonToolResult(data);
+  }
+);
+
+server.registerTool(
+  "preflight",
+  {
+    title: "Verificação de contraparte (CNPJ, LEI ou nome de empresa)",
+    description:
+      "Aceita um CNPJ brasileiro (14 dígitos), um código LEI (20 caracteres) ou um nome de empresa, e devolve um veredito consolidado de contraparte: entidade identificada, banda de risco (clear/flagged/insufficient_data), confiança na cobertura de dado, e os achados componentes com fonte e status individual. Nunca fabrica um score — band/flags são derivados deterministicamente de fatos verificados em fontes públicas oficiais. Pagamento real de $0.15 em USDC (Base mainnet) — sistema separado (AGENTUM Business), carteira diferente das outras ferramentas.",
+    inputSchema: { q: z.string().describe("CNPJ brasileiro (14 dígitos), código LEI (20 caracteres), ou nome de empresa") },
+  },
+  async ({ q }) => {
+    if (!q || !String(q).trim()) throw new Error("Informe 'q' — um CNPJ brasileiro (14 dígitos), um código LEI (20 caracteres) ou um nome de empresa.");
+    const data = await payAndCall("preflight", `/preflight?q=${encodeURIComponent(q)}`, { method: "GET" });
     return jsonToolResult(data);
   }
 );

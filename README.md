@@ -135,8 +135,9 @@ abaixo) sozinho.
 | `vat_validate` | $0.01 | Validação de VAT europeu em tempo real (VIES, oficial da UE) |
 | `company_enrich` | $0.01 | Identificação global de empresa via LEI (GLEIF), qualquer país |
 | `company_intelligence_br` | $0.02 | CNPJ + compliance (TCU, CNJ, CEIS, CNEP, CVM) — só fatos, sem score |
+| `preflight` | $0.15 | Veredito de contraparte (CNPJ, LEI ou nome) — band clear/flagged/insufficient_data, nunca um score fabricado |
 
-`company_intelligence_br` usa uma carteira de destino diferente das outras (sistema AGENTUM Business, processo/domínio separados de propósito) — o servidor já sabe disso e valida cada rota contra a carteira certa dela.
+`company_intelligence_br` e `preflight` usam uma carteira de destino diferente das outras (sistema AGENTUM Business, processo/domínio separados de propósito) — o servidor já sabe disso e valida cada rota contra a carteira certa dela.
 
 ## Rodando a partir do código-fonte (desenvolvimento)
 

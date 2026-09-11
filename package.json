@@ -1,8 +1,8 @@
 {
   "name": "@agentum/mcp-server",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "mcpName": "io.github.orionlabsai/agentum-mcp-server",
-  "description": "Servidor MCP da AGENTUM — dados globais reais (CNPJ, CEP, taxas, CPF, LEI, VAT, câmbio, indicadores) pra qualquer agente de IA consumir via x402, pagando por chamada em USDC.",
+  "description": "Servidor MCP da AGENTUM — dados globais reais (CNPJ, CEP, taxas, CPF, LEI, VAT, câmbio, indicadores, verificação de contraparte) pra qualquer agente de IA consumir via x402, pagando por chamada em USDC.",
   "type": "commonjs",
   "main": "index.js",
   "bin": {
