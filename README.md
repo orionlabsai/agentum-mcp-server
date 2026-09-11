@@ -18,6 +18,12 @@ de **USDC na rede Base** (mainnet, `eip155:8453` — poucos centavos já
 bastam pra testar; o facilitador de pagamento patrocina o gás, só precisa
 de USDC mesmo), e um cliente com suporte a MCP. Escolha o seu:
 
+> ⚠️ **Em toda opção abaixo, a chave fica em texto puro** no arquivo de
+> config ou no comando. Nunca coloque esse arquivo (nem um comando com a
+> chave escrita nele) num repositório git ou num histórico de shell
+> compartilhado/sincronizado — uma chave vazada dá acesso direto à sua
+> carteira, sem precisar do servidor MCP pra nada.
+
 <details>
 <summary><strong>Claude Desktop</strong></summary>
 
@@ -44,19 +50,31 @@ Reinicie o Claude Desktop. Pronto — pergunte algo como "verifica o CNPJ
 <details>
 <summary><strong>Claude Code (CLI)</strong></summary>
 
+Digitar a chave direto no comando grava ela em texto puro no seu
+`~/.zsh_history`/`~/.bash_history` (arquivo que muitos setups de dotfiles
+sincronizam ou versionam sem perceber). Use `read -s` — ele não ecoa o que
+você digita/cola, e o shell grava no histórico o comando **como digitado**
+(com `$AGENTUM_MCP_WALLET_KEY` literal), não o valor já substituído:
+
 ```bash
-claude mcp add agentum --env AGENTUM_MCP_WALLET_KEY=0xSUACHAVEPRIVADAAQUI -- npx -y @agentum/mcp-server
+read -s -p "Cole sua chave privada (0x...): " AGENTUM_MCP_WALLET_KEY && echo
+export AGENTUM_MCP_WALLET_KEY
+claude mcp add agentum -e AGENTUM_MCP_WALLET_KEY=$AGENTUM_MCP_WALLET_KEY -- npx -y @agentum/mcp-server
 ```
 
-(`--env` vem antes do `--`; tudo depois do `--` é passado intacto pro
+(`-e`/`--env` vem antes do `--`; tudo depois do `--` é passado intacto pro
 servidor.)
 </details>
 
 <details>
 <summary><strong>Cursor</strong></summary>
 
-Crie `.cursor/mcp.json` no projeto (ou `~/.cursor/mcp.json` pra valer em
-todos os projetos):
+Prefira `~/.cursor/mcp.json` (vale pra todos os projetos e não fica dentro
+de um repositório git). Só use a versão no projeto (`.cursor/mcp.json`)
+se você **garantir `.cursor/` no `.gitignore` antes do primeiro commit** —
+uma vez que a chave entra no histórico do git, remover o arquivo depois
+não resolve (fica no histórico; precisaria reescrever com `git filter-repo`
+ou equivalente).
 
 ```json
 {
@@ -127,8 +145,12 @@ a configuração aponta pro arquivo local em vez de deixar o `npx` resolver:
 
 ```bash
 npm install
-export AGENTUM_MCP_WALLET_KEY=0xSUACHAVEPRIVADAAQUI
+read -s -p "Cole sua chave privada (0x...): " AGENTUM_MCP_WALLET_KEY && echo
+export AGENTUM_MCP_WALLET_KEY
 ```
+
+(`export VAR=0x...` digitado direto fica gravado em texto puro no seu
+histórico de shell — `read -s` evita isso, ver aviso no Quick Start acima.)
 
 ```json
 {
