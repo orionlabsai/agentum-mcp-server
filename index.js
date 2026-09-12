@@ -147,8 +147,25 @@ async function payAndCall(routeKey, path, requestInit) {
 }
 
 function jsonToolResult(data) {
-  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  return {
+    content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    structuredContent: data,
+  };
 }
+
+// Todas as 11 ferramentas fazem uma chamada x402 real (pagamento em USDC
+// liquidado na Base mainnet) antes de devolver dado -- por isso
+// readOnlyHint:false (o ambiente MUDA: sai dinheiro de verdade da carteira
+// do usuário) e idempotentHint:false (chamar de novo paga de novo, nunca é
+// a mesma operação repetida sem custo). openWorldHint:true porque cada rota
+// consulta fontes externas reais (BrasilAPI/ReceitaWS, BCB, ViaCEP, GLEIF,
+// Frankfurter, Banco Mundial, VIES, TCU/CNJ/CVM).
+const PAID_QUERY_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: true,
+};
 
 const server = new McpServer({ name: "agentum-mcp", version: "1.0.0" });
 
@@ -159,6 +176,19 @@ server.registerTool(
     description:
       "Verifica um CNPJ brasileiro em tempo real (situação cadastral, Simples Nacional, endereço). Pagamento real de $0.02 em USDC (Base mainnet).",
     inputSchema: { cnpj: z.string().describe("CNPJ brasileiro, 14 dígitos, com ou sem pontuação") },
+    outputSchema: {
+      cnpj: z.string().optional().describe("CNPJ só com dígitos"),
+      razao_social: z.string().nullable().optional(),
+      situacao: z.string().nullable().optional().describe("Situação cadastral (ex: ATIVA)"),
+      data_situacao: z.string().nullable().optional(),
+      abertura: z.string().nullable().optional(),
+      natureza_juridica: z.string().nullable().optional(),
+      uf: z.string().nullable().optional(),
+      municipio: z.string().nullable().optional(),
+      atividade_principal: z.string().nullable().optional(),
+      fonte: z.enum(["brasilapi", "receitaws"]).optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ cnpj }) => {
     const clean = onlyDigits(cnpj);
@@ -175,6 +205,19 @@ server.registerTool(
     description:
       "Consulta taxas oficiais brasileiras em tempo real (Selic, CDI, dólar comercial). Pagamento real de $0.01 em USDC (Base mainnet).",
     inputSchema: {},
+    outputSchema: {
+      selic_meta_aa: z
+        .object({ valor: z.union([z.string(), z.number()]).nullable().optional(), data: z.string().nullable().optional(), unidade: z.string().optional() })
+        .optional(),
+      cdi_ad: z
+        .object({ valor: z.union([z.string(), z.number()]).nullable().optional(), data: z.string().nullable().optional(), unidade: z.string().optional() })
+        .optional(),
+      dolar_comercial_venda: z
+        .object({ valor: z.union([z.string(), z.number()]).nullable().optional(), data: z.string().nullable().optional(), unidade: z.string().optional() })
+        .optional(),
+      fonte: z.string().optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async () => {
     const data = await payAndCall("taxas-brasil", "/taxas-brasil", { method: "GET" });
@@ -189,6 +232,17 @@ server.registerTool(
     description:
       "Valida um CEP/endereço brasileiro em tempo real. Pagamento real de $0.01 em USDC (Base mainnet).",
     inputSchema: { cep: z.string().describe("CEP brasileiro, 8 dígitos, com ou sem hífen") },
+    outputSchema: {
+      cep: z.string().optional(),
+      logradouro: z.string().nullable().optional(),
+      bairro: z.string().nullable().optional(),
+      municipio: z.string().nullable().optional(),
+      uf: z.string().nullable().optional(),
+      regiao: z.string().nullable().optional(),
+      ddd: z.string().nullable().optional(),
+      fonte: z.string().optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ cep }) => {
     const clean = onlyDigits(cep);
@@ -205,6 +259,14 @@ server.registerTool(
     description:
       "Confirma se um CPF brasileiro é matematicamente válido (dígito verificador) — não consulta dado pessoal de ninguém. Pagamento real de $0.01 em USDC (Base mainnet).",
     inputSchema: { cpf: z.string().describe("CPF brasileiro, 11 dígitos, com ou sem pontuação") },
+    outputSchema: {
+      cpf: z.string().describe("CPF formatado (000.000.000-00)"),
+      valido: z.boolean(),
+    },
+    // único dos 11 sem fonte externa -- é só o algoritmo do dígito
+    // verificador (ver server.js), então openWorldHint:false aqui,
+    // diferente do resto do PAID_QUERY_ANNOTATIONS.
+    annotations: { ...PAID_QUERY_ANNOTATIONS, openWorldHint: false },
   },
   async ({ cpf }) => {
     const clean = onlyDigits(cpf);
@@ -221,6 +283,20 @@ server.registerTool(
     description:
       "Inteligência empresarial brasileira completa: situação cadastral, endereço, atividades, sócios (CPF sempre mascarado pela própria Receita Federal) e resumo gerado por IA a partir só de dados oficiais. Pagamento real de $0.05 em USDC (Base mainnet).",
     inputSchema: { cnpj: z.string().describe("CNPJ brasileiro, 14 dígitos, com ou sem pontuação") },
+    outputSchema: {
+      company: z.any().optional(),
+      registration: z.any().optional(),
+      address: z.any().optional(),
+      activities: z.any().optional(),
+      partners: z.array(z.any()).optional(),
+      signals: z.any().optional(),
+      summary: z.string().optional(),
+      sources: z.array(z.string()).optional(),
+      confidence: z.number().optional().describe("0 a 1, calculado a partir da fonte e da completude do dado"),
+      queriedAt: z.string().optional(),
+      meta: z.any().optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ cnpj }) => {
     const clean = onlyDigits(cnpj);
@@ -244,6 +320,13 @@ server.registerTool(
       base: z.string().optional().describe("Moeda base (ISO 4217, ex: USD). Default: USD"),
       symbols: z.string().optional().describe("Moedas de destino separadas por vírgula (ex: BRL,EUR). Default: BRL,EUR,USD"),
     },
+    outputSchema: {
+      base: z.string().optional(),
+      date: z.string().optional(),
+      rates: z.record(z.string(), z.number()).optional(),
+      fonte: z.string().optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ base, symbols }) => {
     const qs = new URLSearchParams();
@@ -264,6 +347,16 @@ server.registerTool(
       country: z.string().describe("Código ISO 3166-1 alpha-2 do país (ex: BR, US, DE)"),
       metric: z.enum(["gdp_growth", "inflation", "unemployment", "population"]).describe("Indicador desejado"),
     },
+    outputSchema: {
+      country: z.string().optional(),
+      metric: z.string().optional(),
+      label: z.string().optional(),
+      valor: z.number().optional(),
+      ano: z.string().optional(),
+      unidade: z.string().optional(),
+      fonte: z.string().optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ country, metric }) => {
     const data = await payAndCall("economic-data", `/economic-data?country=${encodeURIComponent(country)}&metric=${encodeURIComponent(metric)}`, { method: "GET" });
@@ -281,6 +374,15 @@ server.registerTool(
       country: z.string().describe("Código de país da UE, 2 letras (ex: IE, DE, FR)"),
       vat: z.string().describe("Número de VAT, sem o prefixo do país"),
     },
+    outputSchema: {
+      country: z.string().optional(),
+      vat: z.string().optional(),
+      valido: z.boolean().optional(),
+      nome: z.string().nullable().optional(),
+      endereco: z.string().nullable().optional(),
+      fonte: z.string().optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ country, vat }) => {
     const data = await payAndCall("vat-validate", `/vat-validate?country=${encodeURIComponent(country)}&vat=${encodeURIComponent(vat)}`, { method: "GET" });
@@ -298,6 +400,15 @@ server.registerTool(
       name: z.string().optional().describe("Nome (ou parte do nome) da empresa a buscar"),
       lei: z.string().optional().describe("Código LEI de 20 caracteres, se já souber"),
     },
+    outputSchema: {
+      lei: z.string().optional(),
+      legalName: z.string().nullable().optional(),
+      jurisdiction: z.string().nullable().optional(),
+      status: z.string().nullable().optional(),
+      registrationStatus: z.string().nullable().optional(),
+      fonte: z.string().optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ name, lei }) => {
     if (!name && !lei) throw new Error("Informe 'name' ou 'lei'.");
@@ -316,6 +427,23 @@ server.registerTool(
     description:
       "Investigação empresarial baseada em evidências pra um CNPJ brasileiro: além do cadastro (BrasilAPI/ReceitaWS), cruza fontes públicas oficiais de compliance — TCU (licitantes inidôneos), CNIA/CNJ, CEIS, CNEP, e CVM quando aplicável. Só fatos e cobertura por fonte, nunca um 'score' inventado. Pagamento real de $0.02 em USDC (Base mainnet) — sistema separado (AGENTUM Business), carteira diferente das outras ferramentas.",
     inputSchema: { cnpj: z.string().describe("CNPJ brasileiro, 14 dígitos, com ou sem pontuação") },
+    outputSchema: {
+      cnpj: z.string().optional(),
+      company: z.any().optional(),
+      findings: z.array(z.any()).optional(),
+      coverage: z.any().optional(),
+      derivedFindings: z.any().optional(),
+      performance: z
+        .object({
+          identityMs: z.number().optional(),
+          publicIntegrityMs: z.number().nullable().optional(),
+          cvmMs: z.number().nullable().optional(),
+          totalMs: z.number().optional(),
+        })
+        .optional(),
+      generatedAt: z.string().optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ cnpj }) => {
     const clean = onlyDigits(cnpj);
@@ -332,6 +460,22 @@ server.registerTool(
     description:
       "Aceita um CNPJ brasileiro (14 dígitos), um código LEI (20 caracteres) ou um nome de empresa, e devolve um veredito consolidado de contraparte: entidade identificada, banda de risco (clear/flagged/insufficient_data), confiança na cobertura de dado, e os achados componentes com fonte e status individual. Nunca fabrica um score — band/flags são derivados deterministicamente de fatos verificados em fontes públicas oficiais. Pagamento real de $0.15 em USDC (Base mainnet) — sistema separado (AGENTUM Business), carteira diferente das outras ferramentas.",
     inputSchema: { q: z.string().describe("CNPJ brasileiro (14 dígitos), código LEI (20 caracteres), ou nome de empresa") },
+    outputSchema: {
+      query: z.object({ type: z.string().optional(), value: z.string().nullable().optional() }).optional(),
+      entity: z
+        .object({
+          name: z.string().nullable().optional(),
+          jurisdiction: z.string().nullable().optional(),
+          identifier: z.object({ type: z.string().optional(), value: z.string().nullable().optional() }).optional(),
+          status: z.string().nullable().optional(),
+        })
+        .optional(),
+      band: z.string().optional().describe("clear | flagged | insufficient_data"),
+      confidence: z.string().optional().describe("high | medium | low"),
+      flags: z.array(z.any()).optional(),
+      components: z.array(z.any()).optional(),
+    },
+    annotations: PAID_QUERY_ANNOTATIONS,
   },
   async ({ q }) => {
     if (!q || !String(q).trim()) throw new Error("Informe 'q' — um CNPJ brasileiro (14 dígitos), um código LEI (20 caracteres) ou um nome de empresa.");
