@@ -1,6 +1,6 @@
 # @agentum/mcp-server
 
-[![M8ven Score](https://m8ven.ai/badge/mcp/orionlabsai-agentum-mcp-server-4k01xb?v=e006e7736ab6150e489a5e4992a74038)](https://m8ven.ai/mcp/orionlabsai-agentum-mcp-server-4k01xb)
+[![M8ven Score](https://m8ven.ai/badge/mcp/orionlabsai-agentum-mcp-server-4k01xb?v=e006e7736ab6150e489a5e4992a74038)](https://m8ven.ai/mcp/orionlabsai-agentum-mcp-server-4k01xb) [![probed by probe402](https://probe402.com/badge/ep_129e6c480b380311)](https://probe402.com/grade/ep_129e6c480b380311)
 
 Servidor MCP (Model Context Protocol) que expõe as APIs reais da AGENTUM
 (dados brasileiros e globais: CNPJ, CEP, taxas oficiais, CPF, inteligência
